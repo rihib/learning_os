@@ -8,20 +8,23 @@ extern char __bss[], __bss_end[];
 extern char __free_ram[], __free_ram_end[];
 extern char _binary_shell_bin_start[], _binary_shell_bin_size[];
 
-void trap_handler(void) {
+__attribute__((aligned(4))) void trap_handler(void)
+{
   printf("trap_handler\n");
 }
 
-void kernel_main(void) {
+void kernel_main(void)
+{
   memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
 
-  WRITE_CSR(stvec, (uintptr_t)trap_handler);
+  WRITE_CSR(stvec, *trap_handler);
 
   PANIC("booted!");
   printf("unreachable here!\n");
 }
 
-__attribute__((section(".text.boot"))) __attribute__((naked)) void boot(void) {
+__attribute__((section(".text.boot"))) __attribute__((naked)) void boot(void)
+{
   __asm__ __volatile__(
       "mv sp, %[stack_top]\n"
       "j kernel_main\n"
@@ -30,7 +33,8 @@ __attribute__((section(".text.boot"))) __attribute__((naked)) void boot(void) {
 }
 
 struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
-                       long arg5, long fid, long eid) {
+                       long arg5, long fid, long eid)
+{
   register long a0 __asm__("a0") = arg0;
   register long a1 __asm__("a1") = arg1;
   register long a2 __asm__("a2") = arg2;
@@ -48,6 +52,7 @@ struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
   return (struct sbiret){.error = a0, .value = a1};
 }
 
-void putchar(char ch) {
+void putchar(char ch)
+{
   sbi_call(ch, 0, 0, 0, 0, 0, 0, 1 /* Console Putchar */);
 }
