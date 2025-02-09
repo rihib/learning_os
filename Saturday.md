@@ -28,7 +28,7 @@ OSの役割には大きく２つあり、ハードウェアリソースの管理
 ### **macOS**
 
 ```bash
-brew install llvm qemu
+brew install llvm qemu lld
 git clone https://github.com/rihib/learn-os-on-weekends.git
 cd learn-os-on-weekends/os
 ```
