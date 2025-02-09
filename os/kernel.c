@@ -18,7 +18,7 @@ void trap_main(void)
          scause, stval, sepc, sstatus);
 }
 
-__attribute__((aligned(4))) void
+__attribute__((aligned(4))) __attribute__((naked)) void
 trap_handler(void)
 {
   __asm__ __volatile__(
@@ -55,11 +55,8 @@ trap_handler(void)
       "sw s11, -116(sp)\n"
       "csrr t0, sscratch\n"
       "sw t0, -120(sp)\n"
-      "addi sp, sp, -124\n");
-
-  trap_main();
-
-  __asm__ __volatile__(
+      "addi sp, sp, -124\n"
+      "call trap_main\n"
       "lw sp, -120(sp)\n"
       "lw s11, -116(sp)\n"
       "lw s10, -112(sp)\n"
