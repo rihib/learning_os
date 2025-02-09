@@ -1,8 +1,11 @@
 #include "common.h"
 
 void *memset(void *buf, char c, size_t n) {
+  // 先頭pointerを記憶しておく
   uint8_t *p = (uint8_t *)buf;
+  // n文だけｃでクリアする
   while (n--) *p++ = c;
+  // 埋めた最後のアドレスを返す。
   return buf;
 }
 

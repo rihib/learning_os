@@ -15,9 +15,11 @@ paddr_t mallocate_pages(int n);
 paddr_t pagealloc(size_t pageCount);
 
 void kernel_main(void) {
+  // memsetはユーザーモードで実行されるので、OSなどが格納されているデータを汚さないようになっている。 → ram(ランダムにアクセスできるメモリ)
+  // bss領域を0でとりあえず、全部０クリアする
   memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
 
-// trapが起こったとき、stvecに保存された関数pointer先にとぶ（ハンドラー）
+  // trapが起こったとき、stvec（特権レジスタ）に保存された関数pointer先にとぶ（ハンドラー）
   WRITE_CSR(stvec,traphandler);
   __ram_top = (paddr_t)__free_ram;
   printf("before: %x\n",__free_ram);
@@ -49,6 +51,8 @@ void page_table(paddr_t table1[], paddr_t p, paddr_t v, paddr_t flags){
   paddr_t vpn1 = v >> 22;
   //　一段目のページリストがあるか
   paddr_t *table0 = table1[vpn1];
+  // 右に12ビットシフトして、
+  // フラグを取り除いて、table0（物理ページ番号と）とPAGESIZEをかけてあげれば、物理アドレス（pointer）が手に入る。
 
   // 上位20ビットを取り出して、ページ番号を把握する
   paddr_t vpn0 = v / PAGE_SIZE;
@@ -62,26 +66,29 @@ void page_table(paddr_t table1[], paddr_t p, paddr_t v, paddr_t flags){
     *table0 = mallocate_pages(1);
   }
   table0[vpn0] = p | flags;
-  table1[vpn1] = *table0 | flags;
+  table1[vpn1] = table0 | flags;
 }
 
-paddr_t mallocate_pages(int n){
+paddr_t mallocate_pages(int page){
   paddr_t free_ram = (paddr_t)__ram_top;
   paddr_t end = (paddr_t)__free_ram_end;
-  paddr_t top = free_ram + n * PAGE_SIZE;
+  paddr_t top = free_ram + page * PAGE_SIZE;
   if (end < top){
     PANIC("failed to allocate pages");
   }
 
   __ram_top = top;
-  paddr_t r = memset(free_ram, 0, n * PAGE_SIZE);
+  paddr_t r = memset(free_ram, 0, page * PAGE_SIZE);
   return r;
 }
 
-// レジスタに渡すからaligned(4)にしているって感じ？
+//　__attribute__((aligned(4)))はメモリへの効率的な配置を指令
 __attribute__((aligned(4))) void traphandler(void){
-  // // sw a0というレジスタからオフセット~でstuck 領域に保存するx。（変数名とかはない）
-  // // 32bitアーキテクチャなので4byte分のスタック領域を確保しなきゃいけない。
+  // まずはmedlegレジスタをCPUが確認して、Sモードに切り変え、CSRと呼ばれるレジスタに状態を保存。
+  // なので、そこから値を読み取る必要がある。
+  // spレジスタにはstuckメモリの先頭アドレスが格納されている。（下から上に）
+  // sw a0というレジスタからオフセット~でstuckメモリに保存する。（変数名とかはない）
+  // 32bitアーキテクチャ（レジスタ）なので4byte分のスタック領域を確保しなきゃいけない。
   __asm__ __volatile__(
     "sw sp, 0(sp);\n"
     "sw a0, -4(sp);\n"
@@ -121,7 +128,9 @@ __attribute__((aligned(4))) void traphandler(void){
   );
   uint32_t error = READ_CSR(scause); 
   uint32_t where = READ_CSR(sepc);
+  // ---トラップ処理---
   PANIC("error occured:%x At : %x\n",error,where);
+  // ---トラップ処理---
   __asm__ __volatile__(
     "lw tp, 4(sp);\n"
     "lw gp, 8(sp);\n"
@@ -156,6 +165,8 @@ __attribute__((aligned(4))) void traphandler(void){
     "lw sp, 124(sp)"
     "sret;\n"
   );
+  // sret命令が実行されると、sstatusレジスタのSPPビットに設定された動作モードに復帰して、
+  // specに格納されたアドレスをプログラムカウンタにセットしなおす
 }
 
 
