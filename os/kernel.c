@@ -24,13 +24,13 @@ void kernel_main(void) {
   __ram_top = (paddr_t)__free_ram;
   printf("before: %x\n",__free_ram);
   paddr_t after = mallocate_pages(1);
-  paddr_t result = __ram_top - after;
-  printf("result: %d\n", result);
+  // paddr_t result = __ram_top - after;
+  // printf("result: %d\n", result);
 
-  printf("before: %x\n",__ram_top);
-  paddr_t after1 = mallocate_pages(1);
-  paddr_t result1 = __ram_top - after1;
-  printf("result: %d\n", result1);
+  // printf("before: %x\n",__ram_top);
+  // paddr_t after1 = mallocate_pages(1);
+  // paddr_t result1 = __ram_top - after1;
+  // printf("result: %d\n", result1);
   __asm__ __volatile__(
     "unimp;\n"
   );
@@ -40,45 +40,33 @@ void kernel_main(void) {
 // PointerAddress_t
 // pagetableはポインタのリスト
 // プロセスに領域を割り当てる処理
-void page_table(paddr_t table1[], paddr_t p, paddr_t v, paddr_t flags){
-  if (!(is_aligned(p,PAGE_SIZE))){
-    PANIC();
-  }
+paddr_t page_table(paddr_t table1[], paddr_t v){
   if (!(is_aligned(v,PAGE_SIZE))){
     PANIC();
   }
-  // 仮想アドレスの上位10ビットを取り出して、ページ番号を把握する
-  paddr_t vpn1 = v >> 22;
-  //　一段目のページリストがあるか
-  paddr_t *table0 = table1[vpn1];
-  // 右に12ビットシフトして、
-  // フラグを取り除いて、table0（物理ページ番号と）とPAGESIZEをかけてあげれば、物理アドレス（pointer）が手に入る。
+  uint32_t vpn1 = (v >> 22) & 0x3FF;
+  uint32_t vpn0 = (v >> 12) & 0x3FF;
+  uint32_t offset = v & 0xFFF;
 
-  // 上位20ビットを取り出して、ページ番号を把握する
-  paddr_t vpn0 = v / PAGE_SIZE;
-  // 中10ビットを抽出
-  vpn0 = vpn0 >> 12;
-  vpn0 = vpn0 & 1024;
-
-  // ゼロ埋めされたモノが来たら(もしくは無効なものが来たら)
-  if (*table0 & PAGE_V == 0) {
-    // フラグを立てる
-    *table0 = mallocate_pages(1);
+  if ((table1[vpn1] & PAGE_V) == 0){
+    
   }
-  table0[vpn0] = p | flags;
-  table1[vpn1] = table0 | flags;
+  uint32_t *table0 = (table1[vpn1] >> 10) << 10;
+  paddr_t paddr = table0[vpn0]
+  
 }
 
-paddr_t mallocate_pages(int page){
+paddr_t mallocate_pages(int pages){
+  // シーケンシャルなアクセスではなく、バイトアドレス指定可能な（ランダムにアクセス可能）
   paddr_t free_ram = (paddr_t)__ram_top;
   paddr_t end = (paddr_t)__free_ram_end;
-  paddr_t top = free_ram + page * PAGE_SIZE;
+  paddr_t top = free_ram + pages * PAGE_SIZE;
   if (end < top){
     PANIC("failed to allocate pages");
   }
 
-  __ram_top = top;
-  paddr_t r = memset(free_ram, 0, page * PAGE_SIZE);
+  paddr_t r = memset(free_ram, 0, pages * PAGE_SIZE);
+  // 埋めた後のアドレス
   return r;
 }
 
