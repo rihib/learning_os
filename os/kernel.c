@@ -8,8 +8,14 @@ extern char __bss[], __bss_end[];
 extern char __free_ram[], __free_ram_end[];
 extern char _binary_shell_bin_start[], _binary_shell_bin_size[];
 
+void trap_handler(void) {
+  printf("trap_handler\n");
+}
+
 void kernel_main(void) {
   memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
+
+  WRITE_CSR(stvec, (uintptr_t)trap_handler);
 
   PANIC("booted!");
   printf("unreachable here!\n");
