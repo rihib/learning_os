@@ -12,7 +12,9 @@ paddr_t __ram_top;
 extern char _binary_shell_bin_start[], _binary_shell_bin_size[];
 void traphandler(void);
 paddr_t mallocate_pages(int n);
-paddr_t pagealloc(size_t pageCount);
+// ページの数だけエントリ数を用意する(2の10乗)
+uint32_t table1[1024];
+
 
 void kernel_main(void) {
   // memsetはユーザーモードで実行されるので、OSなどが格納されているデータを汚さないようになっている。 → ram(ランダムにアクセスできるメモリ)
@@ -22,52 +24,53 @@ void kernel_main(void) {
   // trapが起こったとき、stvec（特権レジスタ）に保存された関数pointer先にとぶ（ハンドラー）
   WRITE_CSR(stvec,traphandler);
   __ram_top = (paddr_t)__free_ram;
-  printf("before: %x\n",__free_ram);
-  paddr_t after = mallocate_pages(1);
-  // paddr_t result = __ram_top - after;
-  // printf("result: %d\n", result);
-
-  // printf("before: %x\n",__ram_top);
-  // paddr_t after1 = mallocate_pages(1);
-  // paddr_t result1 = __ram_top - after1;
-  // printf("result: %d\n", result1);
-  __asm__ __volatile__(
-    "unimp;\n"
-  );
+  paddr_t paddr0 = mallocate_pages(2);
+  paddr_t paddr1 = mallocate_pages(1);
+  printf("alloc_pages test: paddr0=%x\n", paddr0);
+  printf("alloc_pages test: paddr1=%x\n", paddr1);
+  // __asm__ __volatile__(
+  //   "unimp;\n"
+  // );
   printf("continue\n");
 }
 
-// PointerAddress_t
-// pagetableはポインタのリスト
-// プロセスに領域を割り当てる処理
-paddr_t page_table(paddr_t table1[], paddr_t v){
-  if (!(is_aligned(v,PAGE_SIZE))){
-    PANIC();
-  }
-  uint32_t vpn1 = (v >> 22) & 0x3FF;
-  uint32_t vpn0 = (v >> 12) & 0x3FF;
-  uint32_t offset = v & 0xFFF;
-
-  if ((table1[vpn1] & PAGE_V) == 0){
-    
-  }
-  uint32_t *table0 = (table1[vpn1] >> 10) << 10;
-  paddr_t paddr = table0[vpn0]
-  
-}
-
+// シーケンシャルなアクセスではなく、バイトアドレス指定可能な（ランダムにアクセス可能）
+// 動的に物理アドレスを割り当てている。
 paddr_t mallocate_pages(int pages){
-  // シーケンシャルなアクセスではなく、バイトアドレス指定可能な（ランダムにアクセス可能）
-  paddr_t free_ram = (paddr_t)__ram_top;
+  paddr_t origin = (paddr_t)__ram_top;
   paddr_t end = (paddr_t)__free_ram_end;
-  paddr_t top = free_ram + pages * PAGE_SIZE;
+  paddr_t top = __ram_top + pages * PAGE_SIZE;
   if (end < top){
     PANIC("failed to allocate pages");
   }
+  __ram_top = (char *)top;
+  memset(__ram_top, 0, pages * PAGE_SIZE);
 
-  paddr_t r = memset(free_ram, 0, pages * PAGE_SIZE);
-  // 埋めた後のアドレス
-  return r;
+  return origin;
+}
+
+
+void map_page(uint32_t *table1, uint32_t vir_addr, uint32_t psy_addr,uint32_t flag){
+  if( is_aligned(vir_addr,PAGE_SIZE) == 0){
+    PANIC();
+  }
+  if( is_aligned(psy_addr,PAGE_SIZE) == 0){
+    PANIC();
+  }
+  uint32_t vpn1 = (vir_addr >> 22) & 0x3FF;
+  uint32_t vpn0 = (vir_addr >> 12) & 0x3FF;
+
+  // エントリが無かったら、table0を作って、エントリを作成
+  if ((table1[vpn1] & PAGE_V) == 0){
+      // 物理アドレスを取得してくる
+      // 2段目のページテーブルには物理アドレスを割り当てる(4096byte分ある)→free_ramは動的に割り当て可能な領域
+      // 下位12bitは0 → フラグを格納できる
+      uint32_t *table0 = (uint32_t *)mallocate_pages(1);
+      // レジスタは32ビットだが、マシンメモリは34ビット！！
+      table1[vpn1] = (((uint32_t *)table0 / PAGE_SIZE) << 10) | PAGE_V ;
+  }
+  // 物理ページ番号を取得
+  table0[vpn0] = (psy_addr/PAGE_SIZE << 10) | flag | PAGE_V
 }
 
 //　__attribute__((aligned(4)))はメモリへの効率的な配置を指令

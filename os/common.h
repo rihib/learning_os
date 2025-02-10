@@ -7,7 +7,6 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 typedef uint32_t size_t;
 typedef uint32_t paddr_t;
-typedef uint32_t vaddr_t;
 
 #define true 1
 #define false 0
@@ -26,7 +25,7 @@ typedef uint32_t vaddr_t;
 #define SYS_READFILE 4
 #define SYS_WRITEFILE 5
 
-void *memset(void *buf, char c, size_t n);
+void memset(void *buf, char c, size_t n);
 void *memcpy(void *dst, const void *src, size_t n);
 char *strcpy(char *dst, const char *src);
 int strcmp(const char *s1, const char *s2);
