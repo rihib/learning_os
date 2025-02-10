@@ -8,6 +8,9 @@ extern char __bss[], __bss_end[];
 extern char __free_ram[], __free_ram_end[];
 extern char _binary_shell_bin_start[], _binary_shell_bin_size[];
 
+size_t next_alloc = (size_t)__free_ram;
+size_t alloc_page(size_t page_num);
+
 void trap_main(void)
 {
   uint32_t scause = READ_CSR(scause);
@@ -96,7 +99,9 @@ void kernel_main(void)
   memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
 
   WRITE_CSR(stvec, trap_handler);
-  __asm__ __volatile__("unimp");
+
+  size_t allocated_ptr = alloc_page(1);
+  printf("allocated_ptr: %x\n", allocated_ptr);
 
   PANIC("I'm here!\n");
 }
@@ -133,4 +138,17 @@ struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
 void putchar(char ch)
 {
   sbi_call(ch, 0, 0, 0, 0, 0, 0, 1 /* Console Putchar */);
+}
+
+size_t alloc_page(size_t page_num)
+{
+  size_t ret = next_alloc;
+  next_alloc += page_num * PAGE_SIZE;
+  if (next_alloc > (size_t)__free_ram_end)
+  {
+    PANIC("Out of memory!\n");
+  }
+
+  memset((void *)ret, 0, page_num * PAGE_SIZE);
+  return ret;
 }
