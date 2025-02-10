@@ -8,8 +8,7 @@ extern char __bss[], __bss_end[];
 extern char __free_ram[], __free_ram_end[];
 extern char _binary_shell_bin_start[], _binary_shell_bin_size[];
 
-size_t next_alloc = (size_t)__free_ram;
-size_t alloc_page(size_t page_num);
+size_t alloc_pages(size_t page_num);
 
 void trap_main(void)
 {
@@ -100,8 +99,10 @@ void kernel_main(void)
 
   WRITE_CSR(stvec, trap_handler);
 
-  size_t allocated_ptr = alloc_page(1);
-  printf("allocated_ptr: %x\n", allocated_ptr);
+  paddr_t paddr0 = alloc_pages(2);
+  paddr_t paddr1 = alloc_pages(1);
+  printf("alloc_pages test: paddr0=%x\n", paddr0);
+  printf("alloc_pages test: paddr1=%x\n", paddr1);
 
   PANIC("I'm here!\n");
 }
@@ -140,8 +141,9 @@ void putchar(char ch)
   sbi_call(ch, 0, 0, 0, 0, 0, 0, 1 /* Console Putchar */);
 }
 
-size_t alloc_page(size_t page_num)
+size_t alloc_pages(size_t page_num)
 {
+  static size_t next_alloc = (size_t)__free_ram;
   size_t ret = next_alloc;
   next_alloc += page_num * PAGE_SIZE;
   if (next_alloc > (size_t)__free_ram_end)
